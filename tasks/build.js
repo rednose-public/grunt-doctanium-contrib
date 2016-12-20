@@ -9,6 +9,56 @@ module.exports = function(grunt) {
             buildDir: 'web/assets/build'
         });
 
+         var arrayUnique = function(arr) {
+            for (var i = 0; i < arr.length; ++i) {
+                for (var j = i + 1; j < arr.length; ++j) {
+                    if(arr[i] === arr[j]) {
+                        arr.splice(j--, 1);
+                    }
+                }
+            }
+
+            return arr;
+        };
+
+        var isIterable = function(obj) {
+            if (obj == null) {
+                return false;
+            }
+
+            return ((typeof obj != 'string') && (typeof obj[Symbol.iterator] === 'function'));
+        }
+
+        var readConfig = function (buildFile, _config) {
+            buildFile = grunt.file.readJSON(buildFile);
+
+            if (!_config) {
+                _config = buildFile;
+            } else {
+                // Apply config from extended child configuration
+                for (var item in buildFile) {
+                    if (!_config[item]) {
+                        // Add non existing keys
+                        _config[item] = buildFile[item];
+                    } else {
+                        // Merge iteratable (compex) types and ignore scalar types,
+                        // those have already been set by the parent build file.
+                        if (isIterable(buildFile[item]) === true) {
+                            _config[item] = arrayUnique(_config[item].concat(buildFile[item]));
+                        }
+                    }
+                }
+            }
+            
+            if (buildFile.extends) {
+                for (var offset in buildFile.extends) {
+                    readConfig(buildFile.extends[offset], _config);
+                }
+            }
+            
+            return _config;
+        };
+
         this.files.forEach(function(f) {
             f.src.filter(function(filepath) {
 
@@ -24,7 +74,7 @@ module.exports = function(grunt) {
                     return path.dirname(filepath) + '/' + result;
                 }
 
-                var build = grunt.file.readJSON(filepath);
+                var build = readConfig(filepath);
 
                 if (build.cssfiles) {
                     grunt.config('cssmin.' + build.name, {
