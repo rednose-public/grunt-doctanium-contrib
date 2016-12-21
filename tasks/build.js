@@ -27,10 +27,43 @@ module.exports = function(grunt) {
             }
 
             return ((typeof obj != 'string') && (typeof obj[Symbol.iterator] === 'function'));
-        }
+        };
+
+        var expand = function(template, sourceConfig, keyName) {
+            var result = grunt.template.process(template, { data: {
+                bowerPath: options.bowerPath
+            }});
+
+            if (keyName.toLowerCase() === 'jsfiles' || keyName.toLowerCase() === 'cssfiles') {
+                if (grunt.file.isPathAbsolute(result) === false) {
+                    result = '<%= buildFilePath %>/' + result;
+                }
+            }
+
+            return grunt.template.process(result, { data: {
+                buildFilePath: path.dirname(sourceConfig)
+            }});
+        };
 
         var readConfig = function (buildFile, _config) {
+            var buildFilePath = buildFile;
+
             buildFile = grunt.file.readJSON(buildFile);
+
+            var expandPaths = function (c) {
+                /* Expend file paths */
+                for (var item in c) {
+                    if (isIterable(c[item]) === true) {
+                        c[item] = c[item].map(function (template) {
+                            return expand(template, buildFilePath, item)
+                        });
+                    }
+                }
+
+                return c;
+            };
+
+            buildFile = expandPaths(buildFile);
 
             if (!_config) {
                 _config = buildFile;
@@ -49,36 +82,24 @@ module.exports = function(grunt) {
                     }
                 }
             }
-            
+
+
             if (buildFile.extends) {
                 for (var offset in buildFile.extends) {
                     readConfig(buildFile.extends[offset], _config);
                 }
             }
-            
+
             return _config;
         };
 
         this.files.forEach(function(f) {
             f.src.filter(function(filepath) {
-
-                function expand(template) {
-                    var result = grunt.template.process(template, {data: {
-                        bowerPath: options.bowerPath
-                    }});
-
-                    if (grunt.file.isPathAbsolute(result)) {
-                        return result;
-                    }
-
-                    return path.dirname(filepath) + '/' + result;
-                }
-
                 var build = readConfig(filepath);
 
                 if (build.cssfiles) {
                     grunt.config('cssmin.' + build.name, {
-                        src: build.cssfiles.map(expand),
+                        src: build.cssfiles,
                         dest: options.buildDir + '/' + build.name + '/css/' + build.name + '.min.css'
                     });
 
@@ -87,7 +108,7 @@ module.exports = function(grunt) {
 
                 if (build.jsfiles) {
                     grunt.config('uglify.' + build.name, {
-                        src: build.jsfiles.map(expand),
+                        src: build.jsfiles,
                         dest: options.buildDir + '/' + build.name + '/' + build.name + '.min.js'
                     });
 
@@ -107,3 +128,4 @@ module.exports = function(grunt) {
         });
     });
 };
+
