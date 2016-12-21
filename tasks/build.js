@@ -9,7 +9,7 @@ module.exports = function(grunt) {
             buildDir: 'web/assets/build'
         });
 
-         var arrayUnique = function(arr) {
+        var arrayUnique = function(arr) {
             for (var i = 0; i < arr.length; ++i) {
                 for (var j = i + 1; j < arr.length; ++j) {
                     if(arr[i] === arr[j]) {
@@ -34,10 +34,8 @@ module.exports = function(grunt) {
                 bowerPath: options.bowerPath
             }});
 
-            if (keyName.toLowerCase() === 'jsfiles' || keyName.toLowerCase() === 'cssfiles') {
-                if (grunt.file.isPathAbsolute(result) === false) {
-                    result = '<%= buildFilePath %>/' + result;
-                }
+            if (grunt.file.isPathAbsolute(result) === false) {
+                result = '<%= buildFilePath %>/' + result;
             }
 
             return grunt.template.process(result, { data: {
@@ -55,7 +53,11 @@ module.exports = function(grunt) {
                 for (var item in c) {
                     if (isIterable(c[item]) === true) {
                         c[item] = c[item].map(function (template) {
-                            return expand(template, buildFilePath, item)
+                            if (item.toLowerCase() === 'jsfiles' || item.toLowerCase() === 'cssfiles') {
+                                return expand(template, buildFilePath, item);
+                            }
+
+                            return template;
                         });
                     }
                 }
@@ -82,7 +84,6 @@ module.exports = function(grunt) {
                     }
                 }
             }
-
 
             if (buildFile.extends) {
                 for (var offset in buildFile.extends) {
