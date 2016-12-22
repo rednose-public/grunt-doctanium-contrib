@@ -1,10 +1,12 @@
 'use strict';
 
 var path = require('path');
+var Glob = require("glob").Glob;
 
 module.exports = function(grunt) {
     grunt.registerMultiTask('build', 'Build modules.', function() {
         var options = this.options({
+            webDir: 'web/',
             bowerPath: 'bower_components',
             buildDir: 'web/assets/build'
         });
@@ -43,7 +45,9 @@ module.exports = function(grunt) {
             }});
         };
 
-        var readConfig = function (buildFile, _config) {
+        var parseConfig = function (buildFile, _config) {
+            buildFile = options.webDir + buildFile;
+
             var buildFilePath = buildFile;
 
             buildFile = grunt.file.readJSON(buildFile);
@@ -87,46 +91,59 @@ module.exports = function(grunt) {
 
             if (buildFile.extends) {
                 for (var offset in buildFile.extends) {
-                    readConfig(buildFile.extends[offset], _config);
+                    parseConfig(buildFile.extends[offset], _config);
                 }
             }
 
             return _config;
         };
 
-        this.files.forEach(function(f) {
-            f.src.filter(function(filepath) {
-                var build = readConfig(filepath);
-
-                if (build.cssfiles) {
-                    grunt.config('cssmin.' + build.name, {
-                        src: build.cssfiles,
-                        dest: options.buildDir + '/' + build.name + '/css/' + build.name + '.min.css'
-                    });
-
-                    grunt.task.run('cssmin:' + build.name);
-                }
-
-                if (build.jsfiles) {
-                    grunt.config('uglify.' + build.name, {
-                        src: build.jsfiles,
-                        dest: options.buildDir + '/' + build.name + '/' + build.name + '.min.js'
-                    });
-
-                    grunt.task.run('uglify:' + build.name);
-                }
-
-                if (build.copy) {
-                    grunt.config('copy.' + build.name, {
-                        files: build.copy.map(function(dir) {
-                            return {expand: true, cwd: expand(dir[0]), src: '**/*', dest: options.buildDir + '/' + build.name + '/' + dir[1]};
-                        })
-                    });
-
-                    grunt.task.run('copy:' + build.name);
-                }
-            });
+        new Glob(options.webDir + this.data, { sync:true }, function (err, buildFiles) {
+            for (var idx in buildFiles) {
+                run(buildFiles[idx].substring(options.webDir.length));
+            }
         });
+
+        function run(filepath) {
+            var build = parseConfig(filepath),
+                token = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);
+                    return v.toString(16);
+                });
+
+            grunt.config('clean.' + build.name, {
+                src: [ options.buildDir + '/' + build.name + '/*' ]
+            });
+            grunt.task.run('clean:' + build.name);
+
+            if (build.cssfiles) {
+                grunt.config('cssmin.' + build.name, {
+                    src: build.cssfiles,
+                    dest: options.buildDir + '/' + build.name + '/css/' + build.name + '.' + token +  '.min.css'
+                });
+
+                grunt.task.run('cssmin:' + build.name);
+            }
+
+            if (build.jsfiles) {
+                grunt.config('uglify.' + build.name, {
+                    src: build.jsfiles,
+                    dest: options.buildDir + '/' + build.name + '/' + build.name + '.' + token + '.min.js'
+                });
+
+                grunt.task.run('uglify:' + build.name);
+            }
+
+            if (build.copy) {
+                grunt.config('copy.' + build.name, {
+                    files: build.copy.map(function(dir) {
+                        return {expand: true, cwd: expand(dir[0]), src: '**/*', dest: options.buildDir + '/' + build.name + '/' + dir[1]};
+                    })
+                });
+
+                grunt.task.run('copy:' + build.name);
+            }
+        }
     });
 };
 
