@@ -31,7 +31,7 @@ module.exports = function(grunt) {
             return ((typeof obj != 'string') && (typeof obj[Symbol.iterator] === 'function'));
         };
 
-        var expand = function(template, sourceConfig, keyName) {
+        var expand = function(template, sourceConfig) {
             var result = grunt.template.process(template, { data: {
                 bowerPath: options.bowerPath
             }});
@@ -53,12 +53,14 @@ module.exports = function(grunt) {
             buildFile = grunt.file.readJSON(buildFile);
 
             var expandPaths = function (c) {
-                /* Expend file paths */
+                /* Expand file paths */
                 for (var item in c) {
                     if (isIterable(c[item]) === true) {
                         c[item] = c[item].map(function (template) {
                             if (item.toLowerCase() === 'jsfiles' || item.toLowerCase() === 'cssfiles') {
-                                return expand(template, buildFilePath, item);
+                                return expand(template, buildFilePath);
+                            } else if (item.toLowerCase() === 'copy') {
+                                return [expand(template[0], buildFilePath), template[1]];
                             }
 
                             return template;
@@ -80,7 +82,7 @@ module.exports = function(grunt) {
                         // Add non existing keys
                         _config[item] = buildFile[item];
                     } else {
-                        // Merge iteratable (compex) types and ignore scalar types,
+                        // Merge iteratable (complex) types and ignore scalar types,
                         // those have already been set by the parent build file.
                         if (isIterable(buildFile[item]) === true) {
                             _config[item] = arrayUnique(_config[item].concat(buildFile[item]));
@@ -98,14 +100,9 @@ module.exports = function(grunt) {
             return _config;
         };
 
-        new Glob(options.webDir + this.data, { sync:true }, function (err, buildFiles) {
-            for (var idx in buildFiles) {
-                run(buildFiles[idx].substring(options.webDir.length));
-            }
-        });
-
         function run(filepath) {
             var build = parseConfig(filepath),
+
                 token = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
                     var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);
                     return v.toString(16);
@@ -114,6 +111,7 @@ module.exports = function(grunt) {
             grunt.config('clean.' + build.name, {
                 src: [ options.buildDir + '/' + build.name + '/*' ]
             });
+
             grunt.task.run('clean:' + build.name);
 
             if (build.cssfiles) {
@@ -137,13 +135,19 @@ module.exports = function(grunt) {
             if (build.copy) {
                 grunt.config('copy.' + build.name, {
                     files: build.copy.map(function(dir) {
-                        return {expand: true, cwd: expand(dir[0]), src: '**/*', dest: options.buildDir + '/' + build.name + '/' + dir[1]};
+                        return {expand: true, cwd: dir[0], src: '**/*', dest: options.buildDir + '/' + build.name + '/' + dir[1]};
                     })
                 });
 
                 grunt.task.run('copy:' + build.name);
             }
         }
+
+        new Glob(options.webDir + this.data, { sync: true }, function (err, buildFiles) {
+            for (var idx in buildFiles) {
+                run(buildFiles[idx].substring(options.webDir.length));
+            }
+        });
     });
 };
 
